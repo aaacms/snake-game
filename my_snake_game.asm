@@ -35,29 +35,38 @@ direcao:              .word 0
 frutaX:               .word 0
 frutaY:               .word 0
 posicaoEscritaArray:  .word 16
-direcaoCauda:         .word 87
+direcaoCauda:         .word 119
 posicaoArray:         .word 0
 direcaoArray:         .word 0:100
 pontuacao:            .word 0
-gameOver:             .asciiz "Fim de jogo: "
+gameOver:             .asciiz "Você morreu... Sua pontuação: "
+replay:               .asciiz "Você gostaria de tentar novamente?"
 
 .text
+###################################################################################
+#                            Mapa de registradores                                #
+###################################################################################
+#  Nome    Descrição                                                              #
+#  $t0     Posição X da cauda, incremento em crescimento para a direita/esquerda. #
+#  $t1     Posição Y da cauda, incremento em crescimento para cima/baixo,         #
+#               posição X da cobra e verificar direção da cauda                   #
+#  $t2     Usado para armazenar a posição Y da cobra em verificaColisaoFruta.     #
+#  $t3     Posição X da fruta (frutaX), a posição atual do array de posições      #
+#               e para manipulação de valores no placar.                          #
+#  $t4     Usado para armazenar a posição Y da fruta e no cálculo do placar.      #
+#  $t5     Contador da pontuação.                                                 #
+#  $a0     Usado como argumento para syscall e procedimentos.                     #
+#  $a1     Usado como argumento para syscall, posição Y e pontuação em placar.    #
+#  $a2     Usado para carregar a cor da cobra ou cor do fundo ao desenhar na tela,#
+#               e argumento para syscall (som).                                   #
+#  $a3     Usado para armazenar o valor do pixel da posição da fruta              #
+#               e argumento para syscall (som).                                   #
+#  $v0     Usado para armazenar valores de retorno de funções e syscalls          #
+#  $gp     Base do Bitmap display e cálculo de endereços na tela.                 # 
+#  $ra     Usado para armazenar o endereço de retorno para as funções.            #
+###################################################################################
 
-################---------mapa de registradores---------###############
-#Nome    Descrição
-#$t0     Usado para armazenar a posição X da cauda, incremento em crescimento para a direita/esquerda.
-#$t1     Usado para armazenar a posição Y da cauda, incremento em crescimento para cima/baixo. Também usado para armazenar a posição X da cobra (em verificaColisaoFruta) e verificar direção da cauda (em back).
-#$t2     Usado para armazenar a posição Y da cobra em verificaColisaoFruta.
-#$t3     Usado para armazenar a posição X da fruta (frutaX), a posição atual do array de posições (posicaoArray) e para manipulação de valores no placar.
-#$t4     Usado para armazenar a posição Y da fruta (frutaY) em verificaColisaoFruta, e também para a divisão no cálculo do placar.
-#$t5     Usado como contador para a pontuação da cobra (armazena o número de frutas adquiridas).
-#$a0     Usado como argumento para syscall, endereço da fruta ou cauda, e posição X ao chamar pegaEndereco.
-#$a1     Usado como argumento para syscall, posição Y ao chamar pegaEndereco e para carregar a pontuação em placar.
-#$a2     Usado para carregar a cor da cobra ou cor do fundo ao desenhar na tela, e argumento para syscall (som).
-#$a3     Usado para armazenar o valor do pixel da posição da fruta e argumento para syscall (som).
-#$v0     Usado para armazenar o resultado de syscalls, valores de retorno de funções, e endereços calculados em pegaEndereco.
-#$gp     Usado como base para o buffer de vídeo ou cálculo de endereços na tela.
-#$ra     Usado para armazenar o endereço de retorno para as funções.
+.include "numbers.asm"
 
 main:
     lw $a0, larguraTela          # Carrega a largura da tela em unidades (64)
@@ -91,10 +100,9 @@ loopBordaHorizontal:
 bordaVertical:
     addi $t2, $zero, 0           # Inicializa $t2 com 0
     addi $t3, $zero, 252         # Inicializa $t3 com 252 (valor fixo do campo de jogo, 256 - 4)
-    #mul $t4, $t3, 57             # $t4 = endereço de parada (256 * (56 + 1))
 
 loopBordaVertical:
-    beq $t2, 14592, obstaculosH    # Se $t2 for igual a 14592, salta para 'obstaculosH'
+    beq $t2, 14592, obstaculosH  # Se $t2 for igual a 14592  (256 * (56 + 1)), salta para 'obstaculosH'
     add $a0, $gp, $t2            # Atualiza $a0 com o valor de $gp + $t2 (cálculo do endereço do buffer de vídeo)
     sw $a3, 0($a0)               # Armazena a cor no endereço apontado por $a0
     add $a0, $gp, $t3            # Atualiza $a0 com $gp + $t3
@@ -185,13 +193,12 @@ geraCobra:
     lw $a2, verdeClaro           # Carrega a cor da cobra em $a2 
     jal pintaPixel               # Chama a função 'pintaPixel' para pintar o pixel
 
-    addi $t1, $zero, 119         # Inicializa $t1 com o valor 87 (direção inicial da cobra)
+    addi $t1, $zero, 119         # Inicializa $t1 com o valor 119 (direção inicial da cobra)
     sw $t1, direcao              # Armazena o valor de $t1 em 'direcao' (direção da cobra)
     j iniciaDados                # Salta para 'iniciaDados'
 
 iniciaDados:
     addi $t0, $zero, 0           # Inicializa $t0 com 0 (índice do array de direções)
-    #addi $t1, $zero, 87          # Inicializa $t1 com 87 (provavelmente a direção inicial)
     sw $t1, direcaoArray($t0)    # Armazena o valor de $t1 na posição do array 'direcaoArray' no índice $t0
     addi $t0, $t0, 4             # Incrementa $t0 em 4 (próximo índice do array)
     sw $t1, direcaoArray($t0)    # Armazena o valor de $t1 na próxima posição do array 'direcaoArray'
@@ -282,23 +289,23 @@ checaEntrada:
     lw $t0, 0xFFFF0004           # Ler o valor da entrada de teclado
 
     li $t1, 100                  # Presume direita
-    bne $t0, $t1, checkW         # Se não for 'D', verifica 'W'
+    bne $t0, $t1, checaW         # Se não for 'D', verifica 'W'
     sw $t1, direcao              # Armazena direção 'D' se for o caso
     j processaDirecao
 
-checkW:
+checaW:
     li $t1, 119                  # Presume subir
     bne $t0, $t1, checkA         # Se não for 'W', verifica 'A'
     sw $t1, direcao              # Armazena direção 'W' se for o caso
     j processaDirecao
 
-checkA:
+checaA:
     li $t1, 97                   # Presume esquerda
     bne $t0, $t1, checkS         # Se não for 'A', verifica 'S'
     sw $t1, direcao              # Armazena direção 'A' se for o caso
     j processaDirecao
 
-checkS:
+checaS:
     li $t1, 115                  # Presume descer
     bne $t0, $t1, processaDirecao # Se não for 'S', pula para processar direção atual
     sw $t1, direcao              # Armazena direção 'S' se for o caso
@@ -502,23 +509,23 @@ esquerdaCauda:
     j checaEntrada               # Salta para 'checaEntrada'
 
 adquiriuFruta:
-    move $a0, $t3                # Move a posição X da fruta para $a0 (provavelmente para imprimir)
+    move $a0, $t3                # Move a posição X da fruta para $a0
     lw $t3, posicaoArray         # Carrega a posição atual do array de posições
     beqz $t3, vaiProFimDoArray   # Se $t3 for zero, salta para o fim do array (vaiProFimDoArray)
     addi $t3, $t3, -4            # Caso contrário, decrementa $t3 em 4
     j cresceCobra                # Salta
 
 vaiProFimDoArray:
-    addi $t3, $zero, 396         # Inicializa $t3 com 396 (provavelmente para indicar o fim do array)
+    addi $t3, $zero, 396         # Inicializa $t3 com 396 (para indicar o fim do array)
     j cresceCobra
     
 cresceCobra:
-    sw $t3, posicaoArray         # Armazena o valor atualizado de $t3 em 'posicaoArray' (provavelmente indicando a posição atual da cobra)
+    sw $t3, posicaoArray         # Armazena a posição atual da cobra em 'posicaoArray'
     lw $t1, direcaoCauda         # Carrega a direção atual da cauda em $t1
-    beq $t1, 119, cresceParaBaixo # Se $t1 for igual a 87 (W), salta para 'cresceParaBaixo'
-    beq $t1, 115, cresceParaCima  # Se $t1 for igual a 83 (S), salta para 'cresceParaCima'
-    beq $t1, 100, cresceParaEsquerda # Se $t1 for igual a 68 (D), salta para 'cresceParaEsquerda'
-    beq $t1, 97, cresceParaDireita # Se $t1 for igual a 65 (A), salta para 'cresceParaDireita'
+    beq $t1, 119, cresceParaBaixo # Se $t1 for W, salta para 'cresceParaBaixo'
+    beq $t1, 115, cresceParaCima  # Se $t1 for S, salta para 'cresceParaCima'
+    beq $t1, 100, cresceParaEsquerda # Se $t1 for D, salta para 'cresceParaEsquerda'
+    beq $t1, 97, cresceParaDireita # Se $t1 for A, salta para 'cresceParaDireita'
 
 cresceParaBaixo:
     # Atualiza a posição da cauda
@@ -534,14 +541,9 @@ cresceParaBaixo:
     jal pegaEndereco
     move $a0, $v0                # $a0 = endereço da nova posição
 
-    # Desenha o novo segmento da cauda
-    #lw $a2, cauda               # Carrega a cor da cauda
-    #jal pintaPixel
-
     # Gera uma nova fruta e continua o jogo
     jal criaFruta
     j checaEntrada
-
 
 cresceParaCima:
     # Atualiza a posição da cauda
@@ -557,14 +559,9 @@ cresceParaCima:
     jal pegaEndereco
     move $a0, $v0                # $a0 = endereço da nova posição
 
-    # Desenha o novo segmento da cauda
-    #lw $a2, cauda               # Carrega a cor da cauda
-    #jal pintaPixel
-
     # Gera uma nova fruta e continua o jogo
     jal criaFruta
     j checaEntrada
-
 
 cresceParaDireita:
     # Atualiza a posição da cauda
@@ -580,14 +577,9 @@ cresceParaDireita:
     jal pegaEndereco
     move $a0, $v0                # $a0 = endereço da nova posição
 
-    # Desenha o novo segmento da cauda
-    #lw $a2, cauda               # Carrega a cor da cauda
-    #jal pintaPixel
-
     # Gera uma nova fruta e continua o jogo
     jal criaFruta
     j checaEntrada
-
 
 cresceParaEsquerda:
     # Atualiza a posição da cauda
@@ -603,21 +595,16 @@ cresceParaEsquerda:
     jal pegaEndereco
     move $a0, $v0                # $a0 = endereço da nova posição
 
-    # Desenha o novo segmento da cauda
-    #lw $a2, cauda               # Carrega a cor da cauda
-    #jal pintaPixel
-
-    # Gera uma nova fruta e continua o jogo
+   # Gera uma nova fruta e continua o jogo
     jal criaFruta
     j checaEntrada
-
 
 placar:
     div $t4, $t5, 10             # Divide $t5 por 10 e armazena o resultado em $t4 (parte inteira da divisão)
     mul $t3, $t4, 10             # Multiplica $t4 por 10 e armazena o resultado em $t3
     sub $t3, $t5, $t3            # Subtrai $t3 de $t5 para obter o resto (módulo da divisão por 10)
 
-    add $a0, $gp, $zero          # Define $a0 como $gp (provavelmente ponto de partida do buffer gráfico)
+    add $a0, $gp, $zero          # Define $a0 como $gp 
     lw $a2, branco               # Carrega a cor da cobra em $a2
     lw $a3, verdeEscuro          # Carrega a cor do fundo em $a3
 
@@ -632,25 +619,6 @@ placar:
     beq $t3, 7, zero
     beq $t3, 8, zero
     beq $t3, 9, zero
-
-    
-zero:
-    sw $a2, 16120($a0)
-    sw $a2, 16116($a0)
-    sw $a2, 16112($a0)
-    sw $a2, 15864($a0)
-    sw $a3, 15860($a0)
-    sw $a2, 15856($a0)
-    sw $a2, 15608($a0) 
-    sw $a3, 15604($a0)
-    sw $a2, 15600($a0)
-    sw $a2, 15352($a0)
-    sw $a3, 15348($a0)
-    sw $a2, 15344($a0)
-    sw $a2, 15096($a0)
-    sw $a2, 15092($a0)
-    sw $a2, 15088($a0)
-    j placar2
 
 placar2:
     div $t4, $t5, 10
@@ -668,50 +636,72 @@ placar2:
     beq $t4, 8, zero2
     beq $t4, 9, zero2
 
-zero2:
-    sw $a2, 16104($a0)
-    sw $a2, 16100($a0)
-    sw $a2, 16096($a0)
-    sw $a2, 15848($a0)
-    sw $a3, 15844($a0)
-    sw $a2, 15840($a0)
-    sw $a2, 15592($a0)
-    sw $a3, 15588($a0)
-    sw $a2, 15584($a0)
-    sw $a2, 15336($a0)
-    sw $a3, 15332($a0)
-    sw $a2, 15328($a0)
-    sw $a2, 15080($a0) 
-    sw $a2, 15076($a0)
-    sw $a2, 15072($a0)
-    jr $ra
-
 exit:
     # Syscall 31: Gera sons
-    li $v0, 31               # Syscall 31: gera som
-    li $a0, 28               # Define o tipo de som (28)
-    li $a1, 250              # Argumento relacionado à frequência ou duração do som
-    li $a2, 32               # Outro argumento (provavelmente relacionado ao volume)
-    li $a3, 127              # Outro argumento (pode estar relacionado à modulação do som)
-    syscall                  # Executa o syscall 31 para gerar som
+    li $v0, 31
+    li $a0, 28
+    li $a1, 250
+    li $a2, 32
+    li $a3, 127
+    syscall                      # Executa o syscall 31 para gerar som
 
     # Outro som gerado
-    li $a0, 33               # Define o tipo de som (33)
-    li $a1, 250              # Argumento relacionado à frequência ou duração do som
-    li $a2, 32               # Outro argumento (provavelmente relacionado ao volume)
-    li $a3, 127              # Outro argumento (pode estar relacionado à modulação do som)
-    syscall                  # Executa o syscall 31 para gerar som
+    li $a0, 33
+    li $a1, 250
+    li $a2, 32
+    li $a3, 127
+    syscall                      # Executa o syscall 31 para gerar som
 
     # Outro som gerado
-    li $a0, 47               # Define o tipo de som (47)
-    li $a1, 1000             # Argumento relacionado à frequência ou duração do som (provavelmente mais longo)
-    li $a2, 32               # Outro argumento (provavelmente relacionado ao volume)
-    li $a3, 127              # Outro argumento (pode estar relacionado à modulação do som)
-    syscall                  # Executa o syscall 31 para gerar som
+    li $a0, 47
+    li $a1, 1000
+    li $a2, 32
+    li $a3, 127
+    syscall                      # Executa o syscall 31 para gerar som
 
     # Mensagem de fim de jogo
-    li $v0, 56               # Syscall para imprimir uma string (pode variar conforme a implementação)
-    la $a0, gameOver         # Carrega o endereço da mensagem "gameOver" em $a0
-    sw $t5, pontuacao        # Armazena o valor de $t5 (pontuação) em 'pontuacao'
-    lw $a1, pontuacao        # Carrega a pontuação em $a1
-    syscall                  # Executa o syscall para imprimir "gameOver" e a pontuação
+    li $v0, 56                   # Syscall para imprimir mensagem
+    la $a0, gameOver             # Carrega o endereço da mensagem "gameOver" em $a0
+    sw $t5, pontuacao            # Armazena o valor de $t5 (pontuação) em 'pontuacao'
+    lw $a1, pontuacao            # Carrega a pontuação em $a1
+    syscall                      # Executa o syscall para imprimir "gameOver" e a pontuação
+    
+    li $v0, 50                   # Syscall de sim/não
+    la $a0, replay               # Carrega o endereço da mensagem "replay" em $a0
+    syscall
+
+    beqz $a0, resetGame
+    
+    li $v0, 10
+    syscall
+
+resetGame:
+    li $t0, 32                   # Carrega o valor 32 em $t0
+    sw $t0, posicaoX             # Reseta posicaoX para 32
+    sw $t0, posicaoY             # Reseta posicaoY para 32
+    sw $t0, posicaoCaudaX        # Reseta posicaoCaudaX para 32
+    
+    li $t0, 36                   # Carrega o valor 36 em $t0
+    sw $t0, posicaoCaudaY        # Reseta posicaoCaudaY para 36
+
+    li $t0, 150                  # Carrega o valor 150 em $t0
+    sw $t0, speed                # Reseta speed para 150
+
+    li $t0, 0                    # Carrega o valor 0 em $t0
+    sw $t0, frutaX               # Reseta frutaX para 0
+    sw $t0, frutaY               # Reseta frutaY para 0
+    sw $t0, posicaoEscritaArray  # Reseta posicaoEscritaArray para 0
+    sw $t0, posicaoArray         # Reseta posicaoArray para 0
+    sw $t0, direcaoArray         # Reseta direcaoArray para 0
+
+    li $t0, 16                   # Carrega o valor 16 em $t0
+    sw $t0, posicaoEscritaArray  # Reseta posicaoEscritaArray para 16
+
+    li $t0, 119                  # Carrega o valor 87 em $t0
+    sw $t0, direcao              # Reseta direcao para 0 (parado)
+    sw $t0, direcaoCauda         # Reseta direcaoCauda para 87 (W)
+
+    li $t0, 0                    # Carrega o valor 0 em $t0
+    sw $t0, pontuacao            # Reseta pontuação para 0
+
+    j main                       # Retorna da função
